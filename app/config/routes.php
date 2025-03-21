@@ -11,8 +11,8 @@ return static function (RouteBuilder $routes) {
         $builder->setExtensions(['json']);
 
         $builder->scope('/visits', function (RouteBuilder $builder) {
-            $builder->post('/', ['controller' => 'Visits', 'action' => 'store']);
-            $builder->put('/{id}', ['controller' => 'Visits', 'action' => 'update'])->setPass(['id']);
+            $builder->post('/', ['controller' => 'Visits', 'action' => 'add']);
+            $builder->put('/{id}', ['controller' => 'Visits', 'action' => 'edit'])->setPass(['id']);
             $builder->get('/{date}', ['controller' => 'Visits', 'action' => 'visitByDate'])->setPass(['date']);
         });
 

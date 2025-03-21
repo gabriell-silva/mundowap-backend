@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Controller\Component;
 
 use Cake\Controller\Component;
+use Cake\Datasource\ResultSetInterface;
 use Cake\Http\Client;
 use Cake\ORM\TableRegistry;
 
@@ -18,15 +19,21 @@ class AddressServiceComponent extends Component
         $this->addressesTable = TableRegistry::getTableLocator()->get('Addresses');
     }
 
-    public function list()
+    public function list(): ResultSetInterface
     {
-        return $this->getController()
+        $addresses = $this->getController()
             ->Addresses
             ->find()
             ->all();
+
+        foreach ($addresses as $address) {
+            $address->postal_code = $this->formatPostalCode($address->postal_code);
+        }
+
+        return $addresses;
     }
 
-    public function show($id)
+    public function show($id): object
     {
         $address = $this->getController()
             ->Addresses
@@ -38,10 +45,12 @@ class AddressServiceComponent extends Component
             throw new \DomainException('Endereço não encontrado', 404);
         }
 
+        $address->postal_code = $this->formatPostalCode($address->postal_code);
+
         return $address;
     }
 
-    public function create(array $data)
+    public function create(array $data): object
     {
         try {
             $postal_code = $data['postal_code'];
@@ -69,6 +78,8 @@ class AddressServiceComponent extends Component
 
                 throw new \DomainException($errorMsg, 422);
             }
+
+            $result->postal_code = $this->formatPostalCode($result->postal_code);
 
             return $result;
         } catch (\Exception $exception) {
@@ -104,7 +115,7 @@ class AddressServiceComponent extends Component
                 throw new \DomainException('CEP inválido', 422);
             } else {
                 $street = empty($responseVC['logradouro']) ? $data['street'] : $responseVC['logradouro'];
-                $sublocality = empty($data['bairro']) ? $data['sublocality'] : $responseVC['bairro'];
+                $sublocality = empty($responseVC['bairro']) ? $data['sublocality'] : $responseVC['bairro'];
 
                 return [
                     'street' => $street,
@@ -113,9 +124,16 @@ class AddressServiceComponent extends Component
                     'complement' => $data['complement'] ?? null,
                     'city' => $responseVC['localidade'],
                     'state' => $responseVC['uf'],
-                    'postal_code' => $data['cep']
+                    'postal_code' => $data['postal_code']
                 ];
             }
         }
+    }
+
+    private function formatPostalCode(string $postalCode): string
+    {
+        $postalCode = preg_replace('/[^0-9]/', '', $postalCode);
+
+        return substr($postalCode, 0, 5) . '-' . substr($postalCode, 5, 3);
     }
 }

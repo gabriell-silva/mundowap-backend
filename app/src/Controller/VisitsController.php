@@ -50,4 +50,23 @@ class VisitsController extends AppController
 
         return $this->error('Método não permitido', 405);
     }
+
+    public function edit(int $id): Response
+    {
+        try {
+            if($this->request->is('put')) {
+                $data = $this->request->getData();
+
+                $visit = $this->VisitService->update($id, $data);
+
+                return $this->success('Visita atualizada com sucesso!', $visit);
+            }
+        } catch (\DomainException $domainException) {
+            return $this->error($domainException->getMessage(), $domainException->getCode());
+        } catch (\Exception $exception) {
+            return $this->error('Erro ao atualizar visita', 500);
+        }
+
+        return $this->error('Método não permitido', 405);
+    }
 }

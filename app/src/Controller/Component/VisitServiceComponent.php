@@ -63,11 +63,8 @@ class VisitServiceComponent extends Component
                         'foreign_id' => 0
                     ];
 
-                    if (!$this->AddressService) {
-                        throw new \DomainException('Erro ao cadastrar endereço', 422);
-                    }
-
                     $address = $this->AddressService->create($addressData);
+
                     if (!$address) {
                         throw new \DomainException('Erro ao cadastrar endereço', 422);
                     }
@@ -92,46 +89,9 @@ class VisitServiceComponent extends Component
                 }
 
                 $visitData['duration'] = $duration;
+                $visitData['completed'] = $data['completed'] ?? 0;
                 $entity = $visits->newEntity($visitData);
                 $entity = $visits->patchEntity($entity, $visitData);
-
-                try {
-                    $workDay = $this->WorkdaysService->show($data['date']);
-
-                    $newCompleted = $workDay->completed;
-
-                    if ($entity->completed) {
-                        $newCompleted += 1;
-                    }
-
-                    $newTotalDuration = $workDay->duration + $duration;
-
-                    if ($newTotalDuration > 480) {
-                        throw new \DomainException('Limite de horas excedido!', 400);
-                    }
-
-                    $workDay->completed = $newCompleted;
-                    $workDay->duration = $newTotalDuration;
-
-                    $this->WorkdaysService->workDaysTable->save($workDay);
-                } catch (\DomainException $e) {
-                    if ($e->getMessage() === 'Dia útil não encontrado!') {
-                        if ($duration > 480) {
-                            throw new \DomainException('Limite de horas atingido', 400);
-                        }
-
-                        $workdayData = [
-                            'date' => $data['date'],
-                            'visits' => 1,
-                            'completed' => $entity->completed ? 1 : 0,
-                            'duration' => $duration
-                        ];
-
-                        $workDay = $this->WorkdaysService->create($workdayData);
-                    } else {
-                        throw $e;
-                    }
-                }
 
                 $result = $visits->save($entity);
 
@@ -148,6 +108,8 @@ class VisitServiceComponent extends Component
                     throw new \DomainException($errorMsg, 422);
                 }
 
+                $this->WorkdaysService->recalculateWorkday($data['date']);
+
                 if ($addressId && isset($addressData['foreign_id']) && $addressData['foreign_id'] === 0) {
                     $address = $this->AddressService->addressesTable->get($addressId);
                     $address->foreign_id = $entity->id;
@@ -161,14 +123,86 @@ class VisitServiceComponent extends Component
         }
     }
 
-    public function update(array $data, $visitEntity)
+    public function update(int $id, array $data)
     {
         try {
-            $visit = $this->Visits>patchEntity($visitEntity, $data);
+            $visitsTable = $this->getController()->Visits;
+            $addressesTable = $this->AddressService->addressesTable;
 
-            return $this->Visits->save($visit);
+            // Carrega o relacionamento
+            $visitEntity = $visitsTable->get($id, [
+                'contain' => ['Addresses', 'Workdays']
+            ]);
+
+            $originalDate = $visitEntity->date;
+
+            $connection = $visitsTable->getConnection();
+
+            return $connection->transactional(function () use ($visitsTable, $addressesTable, $data, $visitEntity, $originalDate) {
+                // Verifica se há um novo endereço
+
+                if (isset($data['address'])) {
+                    if ($visitEntity['address']->id) {
+                        try {
+                            $addressEntity = $addressesTable->get($visitEntity['address']->id);
+                            $addressesTable->delete($addressEntity);
+                        } catch (\Exception $e) {
+                            throw new \DomainException('Erro ao deletar endereço', 422);
+                        }
+                    }
+
+                    $addressData = [
+                        'postal_code' => $data['address']['postal_code'] ?? '',
+                        'street' => $data['address']['street'] ?? '',
+                        'street_number' => $data['address']['street_number'] ?? '',
+                        'sublocality' => $data['address']['sublocality'] ?? '',
+                        'complement' => $data['address']['complement'] ?? '',
+                        'foreign_table' => 'visits',
+                        'foreign_id' => $visitEntity->id
+                    ];
+
+                    try {
+                        $newAddress = $this->AddressService->create($addressData);
+                        if (!$newAddress) {
+                            throw new \DomainException('Erro ao criar novo endereço', 422);
+                        }
+                        $data['address_id'] = $newAddress->id;
+                    } catch (\Exception $e) {
+                        throw new \DomainException('Erro ao criar novo endereço: ' . $e->getMessage(), 422);
+                    }
+                }
+
+                if (isset($data['address'])) {
+                    unset($data['address']);
+                }
+
+                $visit = $visitsTable->patchEntity($visitEntity, $data);
+
+                // Recalcular duração da visita, caso tenha alterado
+                if (isset($data['forms']) || isset($data['products'])) {
+                    $forms = $data['forms'] ?? $visitEntity->forms;
+                    $products = $data['products'] ?? $visitEntity->products;
+                    $visit->duration = $this->calcDuration($forms, $products);
+                }
+
+                if ($visitsTable->save($visit)) {
+                    if (isset($data['date']) && $data['date'] !== $originalDate) {
+                        $formattedOriginalDate = date('Y-m-d', strtotime(str_replace('/', '-', $originalDate)));
+                        $this->WorkdaysService->recalculateWorkday($formattedOriginalDate);
+                        $this->WorkdaysService->recalculateWorkday($data['date']);
+                    } else {
+                        $this->WorkdaysService->recalculateWorkday($visit->date);
+                    }
+
+                    return $visitsTable->get($visit->id, [
+                        'contain' => ['Addresses', 'Workdays']
+                    ]);
+                }
+
+                throw new \DomainException('Erro ao atualizar visita', 422);
+            });
         } catch (\Exception $exception) {
-            throw new \DomainException('Erro ao atualizar visita', 500);
+            throw new \DomainException('Erro ao atualizar visita' . $exception, 500);
         }
     }
 
@@ -176,7 +210,7 @@ class VisitServiceComponent extends Component
     {
         $duration = 0;
 
-        if($form && $products) {
+        if($form || $products) {
             $duration = ($form * 15) + ($products * 5);
         }
 

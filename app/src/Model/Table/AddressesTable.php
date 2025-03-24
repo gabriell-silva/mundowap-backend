@@ -63,7 +63,7 @@ class AddressesTable extends Table
 
         $validator
             ->scalar('postal_code')
-            ->maxLength('postal_code', 8)
+            ->maxLength('postal_code', 9)
             ->requirePresence('postal_code', 'create')
             ->notEmptyString('postal_code');
 

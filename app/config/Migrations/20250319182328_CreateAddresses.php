@@ -21,7 +21,7 @@ class CreateAddresses extends AbstractMigration
         ]);
 
         $table->addColumn('postal_code', 'string', [
-            'limit' => 8,
+            'limit' => 9,
             'null' => false
         ]);
 

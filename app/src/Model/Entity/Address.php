@@ -32,6 +32,23 @@ class Address extends Entity
      *
      * @var array<string, bool>
      */
+
+    protected function _getPostalCode(?string $value): ?string
+    {
+        if (empty($value)) {
+            return $value;
+        }
+
+        $value = preg_replace('/[^0-9]/', '', $value);
+
+        if (strlen($value) === 8) {
+            return substr($value, 0, 5) . '-' . substr($value, 5, 3);
+        }
+
+        return $value;
+    }
+
+
     protected $_accessible = [
         'foreign_table' => true,
         'foreign_id' => true,

@@ -28,17 +28,18 @@ class VisitServiceComponent extends Component
     public function list(string $date): array
     {
         try {
-            $visit = $this->getController()
+            $visits = $this->getController()
                 ->Visits
                 ->find()
-                ->where(['date' => $date])
+                ->where(['Visits.date' => $date])
+                ->contain(['Addresses', 'Workdays'])
                 ->toArray();
 
-            if(!$visit) {
+            if (empty($visits)) {
                 throw new \DomainException('Não existe visita para data informada.', 404);
-            };
+            }
 
-            return $visit;
+            return $visits;
         } catch (\Exception $exception) {
             throw new \DomainException('Erro ao buscar visita', 400);
         }

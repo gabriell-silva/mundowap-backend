@@ -56,7 +56,7 @@ class WorkdaysServiceComponent extends Component
         throw new \DomainException('Erro ao cadastrar dia útil', 400);
     }
 
-    public function closeDay(string $date): object
+    public function closeDay(string $date): Workday
     {
         if (empty($date)) {
             throw new \DomainException('A data é obrigatória para fechar o dia de trabalho.', 400);

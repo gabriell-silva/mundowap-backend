@@ -2,6 +2,7 @@
 
 namespace App\Controller\Component;
 
+use App\Model\Entity\Visit;
 use Cake\Controller\Component;
 
 class VisitServiceComponent extends Component
@@ -24,13 +25,14 @@ class VisitServiceComponent extends Component
         }
     }
 
-    public function list(string $date)
+    public function list(string $date): array
     {
         try {
             $visit = $this->getController()
                 ->Visits
                 ->find()
-                ->where(['date' => $date]);
+                ->where(['date' => $date])
+                ->toArray();
 
             if(!$visit) {
                 throw new \DomainException('Não existe visita para data informada.', 404);
@@ -42,7 +44,7 @@ class VisitServiceComponent extends Component
         }
     }
 
-    public function create(array $data)
+    public function create(array $data): Visit
     {
         try {
             $visits = $this->getController()->Visits;
@@ -55,10 +57,10 @@ class VisitServiceComponent extends Component
                 if (!empty($data['address'])) {
                     $addressData = [
                         'postal_code' => $data['address']['postal_code'],
-                        'street' => $data['address']['street'],
+                        'street' => $data['address']['street'] ?? '',
                         'street_number' => $data['address']['street_number'],
-                        'sublocality' => $data['address']['sublocality'],
-                        'complement' => $data['address']['complement'],
+                        'sublocality' => $data['address']['sublocality'] ?? '',
+                        'complement' => $data['address']['complement'] ?? '',
                         'foreign_table' => 'visits',
                         'foreign_id' => 0
                     ];
@@ -73,7 +75,7 @@ class VisitServiceComponent extends Component
                 }
 
                 $visitData = $data;
-                if (isset($visitData['address'])) {
+                if (!empty($visitData['address'])) {
                     unset($visitData['address']);
                 }
 
@@ -110,7 +112,7 @@ class VisitServiceComponent extends Component
 
                 $this->WorkdaysService->recalculateWorkday($data['date']);
 
-                if ($addressId && isset($addressData['foreign_id']) && $addressData['foreign_id'] === 0) {
+                if ($addressId && !empty($addressData['foreign_id']) && $addressData['foreign_id'] === 0) {
                     $address = $this->AddressService->addressesTable->get($addressId);
                     $address->foreign_id = $entity->id;
                     $this->AddressService->addressesTable->save($address);
@@ -123,7 +125,7 @@ class VisitServiceComponent extends Component
         }
     }
 
-    public function update(int $id, array $data)
+    public function update(int $id, array $data): Visit
     {
         try {
             $visitsTable = $this->getController()->Visits;
@@ -139,9 +141,7 @@ class VisitServiceComponent extends Component
             $connection = $visitsTable->getConnection();
 
             return $connection->transactional(function () use ($visitsTable, $addressesTable, $data, $visitEntity, $originalDate) {
-                // Verifica se há um novo endereço
-
-                if (isset($data['address'])) {
+                if (!empty($data['address'])) {
                     if ($visitEntity['address']->id) {
                         try {
                             $addressEntity = $addressesTable->get($visitEntity['address']->id);
@@ -163,30 +163,28 @@ class VisitServiceComponent extends Component
 
                     try {
                         $newAddress = $this->AddressService->create($addressData);
-                        if (!$newAddress) {
-                            throw new \DomainException('Erro ao criar novo endereço', 422);
-                        }
+
                         $data['address_id'] = $newAddress->id;
-                    } catch (\Exception $e) {
-                        throw new \DomainException('Erro ao criar novo endereço: ' . $e->getMessage(), 422);
+                    } catch (\Exception $exception) {
+                        throw new \DomainException('Erro ao criar novo endereço', 422);
                     }
                 }
 
-                if (isset($data['address'])) {
+                if (!empty($data['address'])) {
                     unset($data['address']);
                 }
 
                 $visit = $visitsTable->patchEntity($visitEntity, $data);
 
                 // Recalcular duração da visita, caso tenha alterado
-                if (isset($data['forms']) || isset($data['products'])) {
+                if (!empty($data['forms']) || !empty($data['products'])) {
                     $forms = $data['forms'] ?? $visitEntity->forms;
                     $products = $data['products'] ?? $visitEntity->products;
                     $visit->duration = $this->calcDuration($forms, $products);
                 }
 
                 if ($visitsTable->save($visit)) {
-                    if (isset($data['date'])) {
+                    if (!empty($data['date'])) {
                         $newDate = date('Y-m-d', strtotime($data['date']));
 
                         $this->WorkdaysService->recalculateWorkday($originalDate);
@@ -203,7 +201,7 @@ class VisitServiceComponent extends Component
                 throw new \DomainException('Erro ao atualizar visita', 422);
             });
         } catch (\Exception $exception) {
-            throw new \DomainException('Erro ao atualizar visita' . $exception, 500);
+            throw new \DomainException('Erro ao atualizar visita', 500);
         }
     }
 
@@ -211,7 +209,7 @@ class VisitServiceComponent extends Component
     {
         $duration = 0;
 
-        if($form || $products) {
+        if ($form || $products) {
             $duration = ($form * 15) + ($products * 5);
         }
 

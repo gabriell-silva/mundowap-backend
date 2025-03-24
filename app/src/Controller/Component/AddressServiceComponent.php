@@ -45,8 +45,6 @@ class AddressServiceComponent extends Component
             throw new \DomainException($errorMsg, 422);
         }
 
-        $result->postal_code = $this->formatPostalCode($result->postal_code);
-
         return $result;
     }
 
@@ -91,12 +89,5 @@ class AddressServiceComponent extends Component
             'state' => $responseVC['uf'],
             'postal_code' => $data['postal_code']
         ];
-    }
-
-    private function formatPostalCode(string $postalCode): string
-    {
-        $postalCode = preg_replace('/[^0-9]/', '', $postalCode);
-
-        return substr($postalCode, 0, 5) . '-' . substr($postalCode, 5, 3);
     }
 }

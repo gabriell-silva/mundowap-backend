@@ -3,8 +3,8 @@ declare(strict_types=1);
 
 namespace App\Controller\Component;
 
+use App\Model\Entity\Address;
 use Cake\Controller\Component;
-use Cake\Datasource\ResultSetInterface;
 use Cake\Http\Client;
 use Cake\ORM\TableRegistry;
 
@@ -19,81 +19,46 @@ class AddressServiceComponent extends Component
         $this->addressesTable = TableRegistry::getTableLocator()->get('Addresses');
     }
 
-    public function list(): ResultSetInterface
+    public function create(array $data): Address
     {
-        $addresses = $this->getController()
-            ->Addresses
-            ->find()
-            ->all();
+        $address = $this->searchAddress($data);
 
-        foreach ($addresses as $address) {
-            $address->postal_code = $this->formatPostalCode($address->postal_code);
-        }
+        $address['foreign_table'] = $data['foreign_table'] ?? 'default';
+        $address['foreign_id'] = $data['foreign_id'] ?? 1;
 
-        return $addresses;
-    }
+        $entity = $this->addressesTable->newEmptyEntity();
+        $entity = $this->addressesTable->patchEntity($entity, $address);
 
-    public function show($id): object
-    {
-        $address = $this->getController()
-            ->Addresses
-            ->find()
-            ->where(['id' => $id])
-            ->first();
+        $result = $this->addressesTable->save($entity);
 
-        if(!$address) {
-            throw new \DomainException('Endereço não encontrado', 404);
-        }
+        if (!$result) {
+            $errors = $entity->getErrors();
 
-        $address->postal_code = $this->formatPostalCode($address->postal_code);
+            $errorMsg = 'Erro ao salvar endereço';
 
-        return $address;
-    }
-
-    public function create(array $data): object
-    {
-        try {
-            $postal_code = $data['postal_code'];
-
-            $address = $this->searchAddress($postal_code, $data);
-
-            // Adicionar os campos necessários
-            $address['foreign_table'] = $data['foreign_table'] ?? 'default';
-            $address['foreign_id'] = $data['foreign_id'] ?? 1;
-
-            $entity = $this->addressesTable->newEmptyEntity();
-            $entity = $this->addressesTable->patchEntity($entity, $address);
-
-            $result = $this->addressesTable->save($entity);
-
-            if (!$result) {
-                $errors = $entity->getErrors();
-                $errorMsg = 'Erro ao salvar endereço: ';
-
-                foreach ($errors as $field => $fieldErrors) {
-                    foreach ($fieldErrors as $rule => $message) {
-                        $errorMsg .= "$field: $message; ";
-                    }
+            foreach ($errors as $field => $fieldErrors) {
+                foreach ($fieldErrors as $rule => $message) {
+                    $errorMsg .= "$field: $message; ";
                 }
-
-                throw new \DomainException($errorMsg, 422);
             }
 
-            $result->postal_code = $this->formatPostalCode($result->postal_code);
-
-            return $result;
-        } catch (\Exception $exception) {
-            throw new \DomainException('Erro ao cadastrar endereço', 500);
+            throw new \DomainException($errorMsg, 422);
         }
+
+        $result->postal_code = $this->formatPostalCode($result->postal_code);
+
+        return $result;
     }
 
-    public function searchAddress(string $postal_code, array $data): array
+    private function searchAddress(array $data): array
     {
+        $postal_code = $data['postal_code'];
+
         $http = new Client();
 
         $responseRV = $http->get("https://republicavirtual.com.br/web_cep.php?cep=$postal_code&formato=json")->getJson();
 
-        if(isset($responseRV['resultado']) && $responseRV['resultado'] == 1) {
+        if (isset($responseRV['resultado']) && $responseRV['resultado'] == 1) {
             $street = empty($responseRV['tipo_logradouro']) && empty($responseRV['logradouro']) ? $data['street'] : $responseRV['tipo_logradouro'] . ' ' . $responseRV['logradouro'];
             $sublocality = empty($responseRV['bairro']) ? $data['sublocality'] : $responseRV['bairro'];
 
@@ -101,33 +66,31 @@ class AddressServiceComponent extends Component
                 'street' => $street,
                 'sublocality' => $sublocality,
                 'street_number' => $data['street_number'],
-                'complement' => $data['complement'] ?? null,
+                'complement' => $data['complement'] ?? '',
                 'city' => $responseRV['cidade'],
                 'state' => $responseRV['uf'],
                 'postal_code' => $data['postal_code']
             ];
-        } else {
-            $http = new Client();
-
-            $responseVC = $http->get("https://viacep.com.br/ws/{$postal_code}/json")->getJson();
-
-            if(isset($responseVC['erro']) && !!$responseVC['erro']) {
-                throw new \DomainException('CEP inválido', 422);
-            } else {
-                $street = empty($responseVC['logradouro']) ? $data['street'] : $responseVC['logradouro'];
-                $sublocality = empty($responseVC['bairro']) ? $data['sublocality'] : $responseVC['bairro'];
-
-                return [
-                    'street' => $street,
-                    'sublocality' => $sublocality,
-                    'street_number' => $data['street_number'],
-                    'complement' => $data['complement'] ?? null,
-                    'city' => $responseVC['localidade'],
-                    'state' => $responseVC['uf'],
-                    'postal_code' => $data['postal_code']
-                ];
-            }
         }
+
+        $responseVC = $http->get("https://viacep.com.br/ws/{$postal_code}/json")->getJson();
+
+        if (isset($responseVC['erro']) && !!$responseVC['erro']) {
+            throw new \DomainException('CEP inválido', 422);
+        }
+
+        $street = empty($responseVC['logradouro']) ? $data['street'] : $responseVC['logradouro'];
+        $sublocality = empty($responseVC['bairro']) ? $data['sublocality'] : $responseVC['bairro'];
+
+        return [
+            'street' => $street,
+            'sublocality' => $sublocality,
+            'street_number' => $data['street_number'],
+            'complement' => $data['complement'] ?? '',
+            'city' => $responseVC['localidade'],
+            'state' => $responseVC['uf'],
+            'postal_code' => $data['postal_code']
+        ];
     }
 
     private function formatPostalCode(string $postalCode): string

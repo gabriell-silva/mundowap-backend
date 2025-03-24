@@ -2,6 +2,7 @@
 
 namespace App\Controller\Component;
 
+use App\Model\Entity\Workday;
 use Cake\Controller\Component;
 use Cake\ORM\TableRegistry;
 
@@ -20,16 +21,16 @@ class WorkdaysServiceComponent extends Component
     {
         $workdays = $this->workDaysTable
             ->find()
-            ->all();
+            ->toArray();
 
         if (!$workdays) {
             throw new \DomainException('Não existem dias úteis cadastrados.', 404);
         }
 
-        return $workdays->toArray();
+        return $workdays;
     }
 
-    public function show(string $date): object
+    public function show(string $date): Workday
     {
         $workday = $this->workDaysTable
             ->find()
@@ -43,7 +44,7 @@ class WorkdaysServiceComponent extends Component
         return $workday;
     }
 
-    public function create(array $data): object
+    public function create(array $data): Workday
     {
         $workday = $this->workDaysTable->newEmptyEntity();
         $workday = $this->workDaysTable->patchEntity($workday, $data);
@@ -89,7 +90,7 @@ class WorkdaysServiceComponent extends Component
         return $workday;
     }
 
-    function reallocatePendingVisits(array $pendingVisits): void
+    private function reallocatePendingVisits(array $pendingVisits): void
     {
         if (empty($pendingVisits)) {
             return;

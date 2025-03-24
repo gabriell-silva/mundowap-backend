@@ -101,10 +101,10 @@ class WorkdaysServiceComponent extends Component
         $nextDay->modify('+1 day');
         $nextDayStr = $nextDay->format('Y-m-d');
 
-        $MAX_DURATION_PER_DAY = 480;
+        $maxDurationPerDay = 480;
 
         $nextDayDuration = $this->getDayTotalDuration($nextDayStr);
-        $availableDuration = $MAX_DURATION_PER_DAY - $nextDayDuration;
+        $availableDuration = $maxDurationPerDay - $nextDayDuration;
 
         $remainingVisits = [];
 

@@ -57,9 +57,7 @@ class WorkdaysController extends AppController
         } catch (\DomainException $domainException) {
             return $this->error($domainException->getMessage(), $domainException->getCode());
         } catch (\Exception $exception) {
-            return $this->error('Erro interno do servidor!' .$exception, 500);
+            return $this->error('Erro interno do servidor!', 500);
         }
-
-        return $this->error('Método não permitido', 405);
     }
 }

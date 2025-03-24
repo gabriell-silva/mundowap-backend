@@ -119,7 +119,7 @@ class VisitServiceComponent extends Component
                 return $entity;
             });
         } catch (\Exception $exception) {
-            throw new \DomainException('Erro ao cadastrar visita'.$exception, 500);
+            throw new \DomainException('Erro ao cadastrar visita', 500);
         }
     }
 

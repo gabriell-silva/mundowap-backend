@@ -63,7 +63,7 @@ class VisitServiceComponent extends Component
                         'sublocality' => $data['address']['sublocality'] ?? '',
                         'complement' => $data['address']['complement'] ?? '',
                         'foreign_table' => 'visits',
-                        'foreign_id' => 0
+                        'foreign_id' => null
                     ];
 
                     $address = $this->AddressService->create($addressData);
@@ -113,7 +113,7 @@ class VisitServiceComponent extends Component
 
                 $this->WorkdaysService->recalculateWorkday($data['date']);
 
-                if ($addressId && !empty($addressData['foreign_id']) && $addressData['foreign_id'] === 0) {
+                if ($addressId) {
                     $address = $this->AddressService->addressesTable->get($addressId);
                     $address->foreign_id = $entity->id;
                     $this->AddressService->addressesTable->save($address);

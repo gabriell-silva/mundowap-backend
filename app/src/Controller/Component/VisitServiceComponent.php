@@ -134,7 +134,7 @@ class VisitServiceComponent extends Component
                 'contain' => ['Addresses', 'Workdays']
             ]);
 
-            $originalDate = $visitEntity->date;
+            $originalDate = date('Y-m-d', strtotime($visitEntity->date));
 
             $connection = $visitsTable->getConnection();
 
@@ -186,9 +186,10 @@ class VisitServiceComponent extends Component
                 }
 
                 if ($visitsTable->save($visit)) {
-                    if (isset($data['date']) && $data['date'] !== $originalDate) {
-                        $formattedOriginalDate = date('Y-m-d', strtotime(str_replace('/', '-', $originalDate)));
-                        $this->WorkdaysService->recalculateWorkday($formattedOriginalDate);
+                    if (isset($data['date'])) {
+                        $newDate = date('Y-m-d', strtotime($data['date']));
+
+                        $this->WorkdaysService->recalculateWorkday($originalDate);
                         $this->WorkdaysService->recalculateWorkday($data['date']);
                     } else {
                         $this->WorkdaysService->recalculateWorkday($visit->date);

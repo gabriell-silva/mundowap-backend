@@ -55,9 +55,100 @@ class WorkdaysServiceComponent extends Component
         throw new \DomainException('Erro ao cadastrar dia útil', 400);
     }
 
-    public function closeDay(array $date): string
+    public function closeDay(string $date): object
     {
-        return 'Dia útil fechado com sucesso!';
+        if (empty($date)) {
+            throw new \DomainException('A data é obrigatória para fechar o dia de trabalho.', 400);
+        }
+
+        $visitsTable = TableRegistry::getTableLocator()->get('Visits');
+        $pendingVisits = $visitsTable
+            ->find()
+            ->where([
+                'date' => $date,
+                'completed' => 0
+            ])
+            ->toArray();
+
+        $visitsTable->updateAll(
+            ['completed' => 1],
+            ['date' => $date]
+        );
+
+        if (empty($pendingVisits)) {
+            return $this->recalculateWorkday($date);
+        }
+
+        $workday = $this->recalculateWorkday($date);
+
+        if ($workday) {
+            $workday->completed = $workday->visits;
+            $this->workDaysTable->save($workday);
+        }
+
+        return $workday;
+    }
+
+    function reallocatePendingVisits(array $pendingVisits): void
+    {
+        if (empty($pendingVisits)) {
+            return;
+        }
+
+        $visitsTable = TableRegistry::getTableLocator()->get('Visits');
+        $currentDate = new \DateTime($pendingVisits[0]->date);
+        $nextDay = clone $currentDate;
+        $nextDay->modify('+1 day');
+        $nextDayStr = $nextDay->format('Y-m-d');
+
+        $MAX_DURATION_PER_DAY = 480;
+
+        $nextDayDuration = $this->getDayTotalDuration($nextDayStr);
+        $availableDuration = $MAX_DURATION_PER_DAY - $nextDayDuration;
+
+        $remainingVisits = [];
+
+        foreach ($pendingVisits as $visit) {
+            $visit->completed = false;
+
+            if ($availableDuration >= $visit->duration) {
+                $visit->date = $nextDayStr;
+                $visitsTable->save($visit);
+
+                $availableDuration -= $visit->duration;
+            } else {
+                $remainingVisits[] = $visit;
+            }
+        }
+
+        if (!empty($remainingVisits)) {
+            $nextNextDay = clone $nextDay;
+            $nextNextDay->modify('+1 day');
+
+            foreach ($remainingVisits as $visit) {
+                $visit->date = $nextNextDay->format('Y-m-d');
+            }
+
+            $this->reallocatePendingVisits($remainingVisits);
+        }
+
+        $this->recalculateWorkday($nextDayStr);
+    }
+
+    private function getDayTotalDuration(string $date): int
+    {
+        $visitsTable = TableRegistry::getTableLocator()->get('Visits');
+        $visits = $visitsTable
+            ->find()
+            ->where(['date' => $date])
+            ->toArray();
+
+        $totalDuration = 0;
+        foreach ($visits as $visit) {
+            $totalDuration += $visit->duration;
+        }
+
+        return $totalDuration;
     }
 
     public function recalculateWorkday(string $date): object

@@ -48,21 +48,16 @@ class WorkdaysController extends AppController
         return $this->error('Método não permitido', 405);
     }
 
-    public function close(): Response
+    public function close(string $date): Response
     {
         try {
-            if ($this->request->is('post')) {
-                $data = $this->request->getData();
+            $workday = $this->WorkdaysService->closeDay($date);
 
-                $workday = $this->WorkdaysService->closeDay($data);
-
-                return $this->success('Dia de útil fechado com sucesso!', $workday);
-            }
-
+            return $this->success('Dia de útil fechado com sucesso!', $workday);
         } catch (\DomainException $domainException) {
             return $this->error($domainException->getMessage(), $domainException->getCode());
         } catch (\Exception $exception) {
-            return $this->error('Erro interno do servidor!', 500);
+            return $this->error('Erro interno do servidor!' .$exception, 500);
         }
 
         return $this->error('Método não permitido', 405);

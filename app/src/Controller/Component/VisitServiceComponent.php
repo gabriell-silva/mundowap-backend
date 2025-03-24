@@ -192,8 +192,6 @@ class VisitServiceComponent extends Component
 
                 if ($visitsTable->save($visit)) {
                     if (!empty($data['date'])) {
-                        $newDate = date('Y-m-d', strtotime($data['date']));
-
                         $this->WorkdaysService->recalculateWorkday($originalDate);
                         $this->WorkdaysService->recalculateWorkday($data['date']);
                     } else {

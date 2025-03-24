@@ -18,7 +18,7 @@ return static function (RouteBuilder $routes) {
 
         $builder->scope('/workdays', function (RouteBuilder $builder) {
             $builder->get('/', ['controller' => 'Workdays', 'action' => 'index']);
-            $builder->post('/', ['controller' => 'Workdays', 'action' => 'close']);
+            $builder->post('/{date}', ['controller' => 'Workdays', 'action' => 'close'])->setPass(['date']);
         });
 
         $builder->get('/csrf-token', ['controller' => 'App', 'action' => 'getCsrfToken']);

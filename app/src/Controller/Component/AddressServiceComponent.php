@@ -83,7 +83,7 @@ class AddressServiceComponent extends Component
 
             return $result;
         } catch (\Exception $exception) {
-            throw new \DomainException('Erro ao cadastrar endereço'.$exception, 500);
+            throw new \DomainException('Erro ao cadastrar endereço', 500);
         }
     }
 

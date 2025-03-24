@@ -118,7 +118,13 @@ class VisitServiceComponent extends Component
                     $this->AddressService->addressesTable->save($address);
                 }
 
-                return $entity;
+                $visit = $visits->get($entity->id, [
+                    'contain' => ['Addresses', 'Workdays']
+                ]);
+
+                $visit->address = $this->AddressService->addressesTable->get($addressId);
+
+                return $visit;
             });
         } catch (\Exception $exception) {
             throw new \DomainException('Erro ao cadastrar visita', 500);
@@ -142,7 +148,7 @@ class VisitServiceComponent extends Component
 
             return $connection->transactional(function () use ($visitsTable, $addressesTable, $data, $visitEntity, $originalDate) {
                 if (!empty($data['address'])) {
-                    if ($visitEntity['address']->id) {
+                    if (!empty($visitEntity['address']) && $visitEntity['address']->id) {
                         try {
                             $addressEntity = $addressesTable->get($visitEntity['address']->id);
                             $addressesTable->delete($addressEntity);
@@ -205,7 +211,7 @@ class VisitServiceComponent extends Component
         }
     }
 
-    public function calcDuration(int $form, int $products): int
+    private function calcDuration(int $form, int $products): int
     {
         $duration = 0;
 

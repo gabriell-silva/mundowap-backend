@@ -41,7 +41,7 @@ class VisitServiceComponent extends Component
 
             return $visits;
         } catch (\Exception $exception) {
-            throw new \DomainException('Erro ao buscar visita'.$exception->getMessage(), 400);
+            throw new \DomainException('Erro ao buscar visita', 400);
         }
     }
 
